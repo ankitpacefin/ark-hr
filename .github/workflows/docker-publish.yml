@@ -17,9 +17,6 @@ permissions:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    env:
-      REGISTRY: ${{ env.REGISTRY }}
-      IMAGE_NAME: ${{ env.IMAGE_NAME }}
 
     steps:
       - name: Checkout code
@@ -54,13 +51,13 @@ jobs:
       - name: Determine build command
         id: determine_build_command
         run: |
-          # Write build command to GITHUB_OUTPUT (recommended replacement for set-output)
+          # Write build command to GITHUB_OUTPUT (replacement for set-output)
           if [ "${{ github.ref }}" = "refs/heads/develop" ]; then
             echo "BUILD_COMMAND=build" >> $GITHUB_OUTPUT
           elif [ "${{ github.ref }}" = "refs/heads/pre-prod" ]; then
             echo "BUILD_COMMAND=build:pre-prod" >> $GITHUB_OUTPUT
           else
-            # Use "build:prod" only if present in package.json; otherwise set to "build"
+            # set to build:prod — change to "build" if you don't have build:prod script
             echo "BUILD_COMMAND=build:prod" >> $GITHUB_OUTPUT
           fi
 
@@ -101,15 +98,13 @@ jobs:
           platforms: linux/amd64,linux/arm64/v8
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # If your Dockerfile does not include a stage named "runner", remove the following line:
           target: runner
           build-args: |
             BUILD_COMMAND=${{ steps.determine_build_command.outputs.BUILD_COMMAND }}
-          # optional: set outputs for other steps if needed
-          outputs: |
-            image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.new_version }}
 
       - name: Output build information
         run: |
           echo "Image tags: ${{ steps.meta.outputs.tags }}"
-          echo "Built image (example tag): ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.new_version }}"
+          echo "Example image (version): ${{ env.REGISTRY }}/${{ github.repository }}:${{ steps.version.outputs.new_version || 'N/A' }}"
           echo "Supported architectures: linux/amd64, linux/arm64/v8"
