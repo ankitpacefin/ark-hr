@@ -1,65 +1,220 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { MOCK_APPLICATIONS } from "@/lib/mock-data"
-import { ApplicationsTable } from "@/components/applications/applications-table"
-import { ApplicationsKanban } from "@/components/applications/applications-kanban"
-import { ApplicationSheet } from "@/components/applications/application-sheet"
-import { Application } from "@/types"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { LayoutList, Kanban } from "lucide-react"
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { getApplicants } from "@/backend/actions/applicants";
+import { getJobs } from "@/backend/actions/jobs";
+import { ApplicantsList } from "@/components/applications/applicants-list";
+import { ApplicantsKanban } from "@/components/applications/applicants-kanban";
+import { ApplicantsTableSkeleton } from "@/components/applications/applicants-table-skeleton";
+import { Filters } from "@/components/applications/filters";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { LayoutList, Kanban, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { DateRange } from "react-day-picker";
+
+// Mock workspace ID for now - in real app this comes from context/auth
+const WORKSPACE_ID = "f135f0f0-6fdb-4d6e-acd2-01404c138ce0"; // Correct ID from DB
 
 export default function ApplicationsPage() {
-    const [selectedApp, setSelectedApp] = useState<Application | null>(null)
-    const [sheetOpen, setSheetOpen] = useState(false)
+    const [view, setView] = useState("list");
+    const [applicants, setApplicants] = useState<any[]>([]);
+    const [totalCount, setTotalCount] = useState(0);
+    const [jobs, setJobs] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const handleSelectApplication = (app: Application) => {
-        setSelectedApp(app)
-        setSheetOpen(true)
-    }
+    // Filters
+    const [search, setSearch] = useState("");
+    const [jobId, setJobId] = useState("all");
+    const [status, setStatus] = useState("all");
+    const [skills, setSkills] = useState<string[]>([]);
+    const [experience, setExperience] = useState("");
+    const [company, setCompany] = useState<string[]>([]);
+    const [domain, setDomain] = useState<string[]>([]);
+    const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+    const [assignedTo, setAssignedTo] = useState("all");
+
+    const [page, setPage] = useState(1);
+    const limit = 10;
+
+    useEffect(() => {
+        fetchJobs();
+    }, []);
+
+    useEffect(() => {
+        fetchApplicants();
+    }, [search, jobId, status, skills, experience, company, domain, dateRange, assignedTo, page, view]); // Re-fetch on filter change
+
+    const fetchJobs = async () => {
+        try {
+            const data = await getJobs(WORKSPACE_ID);
+            setJobs(data || []);
+        } catch (error) {
+            console.error("Failed to fetch jobs", error);
+        }
+    };
+
+    const fetchApplicants = async () => {
+        setIsLoading(true);
+        try {
+            const { data, count } = await getApplicants(WORKSPACE_ID, {
+                search,
+                job_id: jobId,
+                status,
+                skills,
+                experience,
+                company,
+                domain,
+                dateFrom: dateRange?.from,
+                dateTo: dateRange?.to,
+                assigned_to: assignedTo,
+                page,
+                limit: view === "kanban" ? 100 : limit, // Load more for Kanban
+            });
+            setApplicants(data || []);
+            setTotalCount(count || 0);
+        } catch (error) {
+            toast.error("Failed to fetch applicants");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const resetFilters = () => {
+        setSearch("");
+        setJobId("all");
+        setStatus("all");
+        setSkills([]);
+        setExperience("");
+        setCompany([]);
+        setDomain([]);
+        setDateRange(undefined);
+        setAssignedTo("all");
+        setPage(1);
+    };
+
+    const handleExport = async () => {
+        try {
+            const { data } = await getApplicants(WORKSPACE_ID, {
+                search,
+                job_id: jobId,
+                status,
+                skills,
+                experience,
+                company,
+                domain,
+                dateFrom: dateRange?.from,
+                dateTo: dateRange?.to,
+                assigned_to: assignedTo,
+                page: 1,
+                limit: 10000, // Fetch all for export
+            });
+
+            if (!data || data.length === 0) {
+                toast.error("No data to export");
+                return;
+            }
+
+            const headers = ["Name", "Email", "Phone", "Job Title", "Applied Date", "Status", "Score", "Assigned To"];
+            const csvContent = [
+                headers.join(","),
+                ...data.map((app: any) => [
+                    `"${app.name}"`,
+                    `"${app.email}"`,
+                    `"${app.mobile_number || ""}"`,
+                    `"${app.jobs?.title || app.job_id}"`,
+                    `"${new Date(app.applied_at).toLocaleDateString()}"`,
+                    `"${app.status}"`,
+                    `"${app.ats_score || 0}"`,
+                    `"${app.assigned_to || "Unassigned"}"` // We might need to fetch user names if not joined, but for now ID or simple check
+                ].join(","))
+            ].join("\n");
+
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", "applicants_export.csv");
+            link.style.visibility = "hidden";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (error) {
+            toast.error("Failed to export data");
+        }
+    };
+
+    const handleApplicantUpdate = (updatedApplicant: any) => {
+        setApplicants((prev) =>
+            prev.map((app) => (app.id === updatedApplicant.id ? { ...app, ...updatedApplicant } : app))
+        );
+    };
 
     return (
-        <div className="flex flex-col gap-6 h-full">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Applications</h1>
-                    <p className="text-muted-foreground">Manage and track candidate applications.</p>
+        <div className="flex-1 space-y-4 p-8 pt-6">
+            <div className="flex items-center justify-between space-y-2">
+                <h2 className="text-3xl font-bold tracking-tight">Applications</h2>
+                <div className="flex items-center space-x-2">
+                    <Tabs value={view} onValueChange={setView}>
+                        <TabsList>
+                            <TabsTrigger value="list">
+                                <LayoutList className="mr-2 h-4 w-4" />
+                                List
+                            </TabsTrigger>
+                            <TabsTrigger value="kanban">
+                                <Kanban className="mr-2 h-4 w-4" />
+                                Kanban
+                            </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
                 </div>
             </div>
+            <div className="space-y-4">
+                <Filters
+                    search={search}
+                    setSearch={setSearch}
+                    jobId={jobId}
+                    setJobId={setJobId}
+                    status={status}
+                    setStatus={setStatus}
+                    jobs={jobs}
+                    resetFilters={resetFilters}
+                    skills={skills}
+                    setSkills={setSkills}
+                    experience={experience}
+                    setExperience={setExperience}
+                    company={company}
+                    setCompany={setCompany}
+                    domain={domain}
+                    setDomain={setDomain}
+                    dateRange={dateRange}
+                    setDateRange={setDateRange}
+                    assignedTo={assignedTo}
+                    setAssignedTo={setAssignedTo}
+                />
 
-            <Tabs defaultValue="list" className="h-full flex flex-col">
-                <div className="flex items-center justify-between mb-4">
-                    <TabsList>
-                        <TabsTrigger value="list" className="flex items-center gap-2">
-                            <LayoutList className="h-4 w-4" />
-                            List
-                        </TabsTrigger>
-                        <TabsTrigger value="kanban" className="flex items-center gap-2">
-                            <Kanban className="h-4 w-4" />
-                            Kanban
-                        </TabsTrigger>
-                    </TabsList>
-                </div>
-
-                <TabsContent value="list" className="flex-1">
-                    <ApplicationsTable
-                        applications={MOCK_APPLICATIONS}
-                        onSelectApplication={handleSelectApplication}
+                {isLoading ? (
+                    view === "list" ? (
+                        <ApplicantsTableSkeleton />
+                    ) : (
+                        <div className="flex justify-center py-8">
+                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                        </div>
+                    )
+                ) : view === "list" ? (
+                    <ApplicantsList
+                        applicants={applicants}
+                        totalCount={totalCount}
+                        page={page}
+                        setPage={setPage}
+                        limit={limit}
+                        onUpdate={handleApplicantUpdate}
+                        onExport={handleExport}
                     />
-                </TabsContent>
-                <TabsContent value="kanban" className="flex-1 h-full">
-                    <ApplicationsKanban
-                        applications={MOCK_APPLICATIONS}
-                        onSelectApplication={handleSelectApplication}
-                    />
-                </TabsContent>
-            </Tabs>
-
-            <ApplicationSheet
-                application={selectedApp}
-                open={sheetOpen}
-                onOpenChange={setSheetOpen}
-            />
+                ) : (
+                    <ApplicantsKanban applicants={applicants} onUpdate={fetchApplicants} />
+                )}
+            </div>
         </div>
-    )
+    );
 }

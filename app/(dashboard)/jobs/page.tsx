@@ -1,38 +1,36 @@
-import { MOCK_JOBS } from "@/lib/mock-data"
-import { JobCard } from "@/components/jobs/job-card"
-import { JobFilters } from "@/components/jobs/job-filters"
-import { Button } from "@/components/ui/button"
-import { Plus } from "lucide-react"
-import Link from "next/link"
+import { redirect } from "next/navigation";
+import { createClient } from "@/utils/supabase/server";
+import { JobsList } from "@/components/jobs/jobs-list";
 
-export default function JobsPage() {
+export default async function JobsPage() {
+    const supabase = await createClient();
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+        return redirect("/");
+    }
+
+    // Fetch the first workspace for now. 
+    // In a real app, this would come from the user's selected workspace or context.
+    const { data: workspaces } = await supabase.from("workspaces").select("id").limit(1);
+
+    if (!workspaces || workspaces.length === 0) {
+        return (
+            <div className="p-8">
+                <h1 className="text-2xl font-bold">No Workspace Found</h1>
+                <p>Please create a workspace to manage jobs.</p>
+            </div>
+        );
+    }
+
+    const workspaceId = workspaces[0].id;
+
     return (
-        <div className="flex flex-col gap-6 h-full">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Jobs</h1>
-                    <p className="text-muted-foreground">Manage your job postings and view applicants.</p>
-                </div>
-                <Button asChild>
-                    <Link href="/jobs/new">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Create Job
-                    </Link>
-                </Button>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
-                <div className="lg:col-span-1">
-                    <JobFilters />
-                </div>
-                <div className="lg:col-span-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {MOCK_JOBS.map((job) => (
-                            <JobCard key={job.id} job={job} />
-                        ))}
-                    </div>
-                </div>
-            </div>
+        <div className="flex-1 space-y-4 p-8 pt-6">
+            <JobsList workspaceId={workspaceId} />
         </div>
-    )
+    );
 }

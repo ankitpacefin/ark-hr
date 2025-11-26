@@ -36,11 +36,6 @@ export function JobCard({ job }: JobCardProps) {
                         <Briefcase className="h-3 w-3" />
                         {job.type}
                     </Badge>
-                    {job.salaryRange && (
-                        <Badge variant="outline" className="flex gap-1 items-center">
-                            <span className="font-mono">{job.salaryRange}</span>
-                        </Badge>
-                    )}
                 </div>
                 <div
                     className="text-sm text-muted-foreground line-clamp-3 prose prose-sm dark:prose-invert"

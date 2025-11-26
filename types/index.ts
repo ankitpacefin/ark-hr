@@ -9,19 +9,18 @@ export interface Job {
   location: string;
   locationType: JobLocationType;
   type: JobType;
-  salaryRange?: string;
   questions: string[]; // Custom questions for applicants
   status: JobStatus;
   createdAt: string;
   applicantsCount: number;
 }
 
-export type ApplicationStatus = 
-  | 'New' 
-  | 'Screening' 
-  | 'Interview' 
-  | 'Offer' 
-  | 'Hired' 
+export type ApplicationStatus =
+  | 'New'
+  | 'Screening'
+  | 'Interview'
+  | 'Offer'
+  | 'Hired'
   | 'Rejected';
 
 export interface Applicant {
@@ -31,6 +30,25 @@ export interface Applicant {
   phone: string;
   resumeUrl?: string;
   avatarUrl?: string;
+  skills: string[];
+  experience: number; // Years of experience
+  currentTitle: string;
+  socialLinks?: {
+    linkedin?: string;
+    twitter?: string;
+    github?: string;
+    portfolio?: string;
+  };
+  website?: string;
+  projects?: {
+    name: string;
+    url: string;
+    description?: string;
+  }[];
+  screenerAnswers?: {
+    question: string;
+    answer: string;
+  }[];
 }
 
 export interface HRProfile {
