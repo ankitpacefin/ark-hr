@@ -58,7 +58,7 @@ jobs:
             echo "BUILD_COMMAND=build:pre-prod" >> $GITHUB_OUTPUT
           else
             # set to build:prod — change to "build" if you don't have build:prod script
-            echo "BUILD_COMMAND=build:prod" >> $GITHUB_OUTPUT
+            echo "BUILD_COMMAND=build" >> $GITHUB_OUTPUT
           fi
 
       - name: Login to GitHub Container Registry
@@ -76,7 +76,7 @@ jobs:
         with:
           driver: docker-container
           buildkitd-flags: --debug
-          platforms: linux/amd64,linux/arm64/v8
+          platforms: linux/amd64,linux/arm64
 
       - name: Extract metadata for Docker
         id: meta
@@ -95,7 +95,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64/v8
+          platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
           # If your Dockerfile does not include a stage named "runner", remove the following line:
@@ -107,4 +107,4 @@ jobs:
         run: |
           echo "Image tags: ${{ steps.meta.outputs.tags }}"
           echo "Example image (version): ${{ env.REGISTRY }}/${{ github.repository }}:${{ steps.version.outputs.new_version || 'N/A' }}"
-          echo "Supported architectures: linux/amd64, linux/arm64/v8"
+          echo "Supported architectures: linux/amd64, linux/arm64"

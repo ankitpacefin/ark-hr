@@ -3,6 +3,7 @@ ARG BUILD_COMMAND=build
 
 # Builder stage
 FROM node:20-alpine AS builder
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Install deps
@@ -16,6 +17,7 @@ RUN npm run ${BUILD_COMMAND}
 
 # Runner stage (smaller image)
 FROM node:20-alpine AS runner
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # copy only production assets from builder
