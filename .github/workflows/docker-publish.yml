@@ -10,68 +10,30 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    env:
+      REGISTRY: ${{ env.REGISTRY }}
+      IMAGE_NAME: ${{ env.IMAGE_NAME }}
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v1
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Determine version number
-        id: version
-        uses: hennejg/github-tag-action@v4.3.1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Determine build command
-        id: determine_build_command
-        run: |
-          if [ "${{ github.ref }}" = "refs/heads/develop" ]; then
-              echo "::set-output name=BUILD_COMMAND::build"
-          elif [ "${{ github.ref }}" = "refs/heads/pre-prod" ]; then
-              echo "::set-output name=BUILD_COMMAND::build:pre-prod"
-          else
-              echo "::set-output name=BUILD_COMMAND::build:prod"
-          fi
-        shell: bash
-        env:
-          BUILD_COMMAND: ${{ steps.determine_build_command.outputs.BUILD_COMMAND }}
-
-      - name: Build Docker Image
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ghcr.io/pocketful-tech/seo-web:${{ steps.version.outputs.new_version }}
-          build-args: BUILD_COMMAND=${{ steps.determine_build_command.outputs.BUILD_COMMAND }}
-
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Node.js
+      - name: Setup Node.js (for lint/tests)
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install dependencies (CI)
         run: |
           if [ -f package-lock.json ]; then
             npm ci --legacy-peer-deps
@@ -83,8 +45,27 @@ jobs:
         run: npm run lint --legacy-peer-deps
         continue-on-error: true
 
+      - name: Determine version number
+        id: version
+        uses: hennejg/github-tag-action@v4.3.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine build command
+        id: determine_build_command
+        run: |
+          # Write build command to GITHUB_OUTPUT (recommended replacement for set-output)
+          if [ "${{ github.ref }}" = "refs/heads/develop" ]; then
+            echo "BUILD_COMMAND=build" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" = "refs/heads/pre-prod" ]; then
+            echo "BUILD_COMMAND=build:pre-prod" >> $GITHUB_OUTPUT
+          else
+            # Use "build:prod" only if present in package.json; otherwise set to "build"
+            echo "BUILD_COMMAND=build:prod" >> $GITHUB_OUTPUT
+          fi
+
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v2
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -113,6 +94,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: ./Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -120,9 +102,14 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           target: runner
+          build-args: |
+            BUILD_COMMAND=${{ steps.determine_build_command.outputs.BUILD_COMMAND }}
+          # optional: set outputs for other steps if needed
+          outputs: |
+            image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.new_version }}
 
       - name: Output build information
         run: |
-          echo "Multi-arch image built and pushed to:"
-          echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
+          echo "Image tags: ${{ steps.meta.outputs.tags }}"
+          echo "Built image (example tag): ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.new_version }}"
           echo "Supported architectures: linux/amd64, linux/arm64/v8"
