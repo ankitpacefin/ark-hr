@@ -6,8 +6,6 @@ Dockerfile*
 .gitignore
 .vscode
 .idea
-.env
-.env.local
 .next/cache
 dist
 coverage
