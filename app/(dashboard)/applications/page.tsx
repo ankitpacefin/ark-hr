@@ -5,11 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { getApplicants } from "@/backend/actions/applicants";
 import { getJobs } from "@/backend/actions/jobs";
 import { ApplicantsList } from "@/components/applications/applicants-list";
-import { ApplicantsKanban } from "@/components/applications/applicants-kanban";
 import { ApplicantsTableSkeleton } from "@/components/applications/applicants-table-skeleton";
 import { Filters } from "@/components/applications/filters";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { LayoutList, Kanban, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { DateRange } from "react-day-picker";
 
@@ -17,7 +14,6 @@ import { DateRange } from "react-day-picker";
 const WORKSPACE_ID = "f135f0f0-6fdb-4d6e-acd2-01404c138ce0"; // Correct ID from DB
 
 export default function ApplicationsPage() {
-    const [view, setView] = useState("list");
     const [applicants, setApplicants] = useState<any[]>([]);
     const [totalCount, setTotalCount] = useState(0);
     const [jobs, setJobs] = useState<any[]>([]);
@@ -43,7 +39,7 @@ export default function ApplicationsPage() {
 
     useEffect(() => {
         fetchApplicants();
-    }, [search, jobId, status, skills, experience, company, domain, dateRange, assignedTo, page, view]); // Re-fetch on filter change
+    }, [search, jobId, status, skills, experience, company, domain, dateRange, assignedTo, page]);
 
     const fetchJobs = async () => {
         try {
@@ -69,7 +65,7 @@ export default function ApplicationsPage() {
                 dateTo: dateRange?.to,
                 assigned_to: assignedTo,
                 page,
-                limit: view === "kanban" ? 100 : limit, // Load more for Kanban
+                limit,
             });
             setApplicants(data || []);
             setTotalCount(count || 0);
@@ -126,7 +122,7 @@ export default function ApplicationsPage() {
                     `"${new Date(app.applied_at).toLocaleDateString()}"`,
                     `"${app.status}"`,
                     `"${app.ats_score || 0}"`,
-                    `"${app.assigned_to || "Unassigned"}"` // We might need to fetch user names if not joined, but for now ID or simple check
+                    `"${app.assigned_to || "Unassigned"}"`
                 ].join(","))
             ].join("\n");
 
@@ -154,20 +150,6 @@ export default function ApplicationsPage() {
         <div className="flex-1 space-y-4 p-8 pt-6">
             <div className="flex items-center justify-between space-y-2">
                 <h2 className="text-3xl font-bold tracking-tight">Applications</h2>
-                <div className="flex items-center space-x-2">
-                    <Tabs value={view} onValueChange={setView}>
-                        <TabsList>
-                            <TabsTrigger value="list">
-                                <LayoutList className="mr-2 h-4 w-4" />
-                                List
-                            </TabsTrigger>
-                            <TabsTrigger value="kanban">
-                                <Kanban className="mr-2 h-4 w-4" />
-                                Kanban
-                            </TabsTrigger>
-                        </TabsList>
-                    </Tabs>
-                </div>
             </div>
             <div className="space-y-4">
                 <Filters
@@ -194,14 +176,8 @@ export default function ApplicationsPage() {
                 />
 
                 {isLoading ? (
-                    view === "list" ? (
-                        <ApplicantsTableSkeleton />
-                    ) : (
-                        <div className="flex justify-center py-8">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                        </div>
-                    )
-                ) : view === "list" ? (
+                    <ApplicantsTableSkeleton />
+                ) : (
                     <ApplicantsList
                         applicants={applicants}
                         totalCount={totalCount}
@@ -211,8 +187,6 @@ export default function ApplicationsPage() {
                         onUpdate={handleApplicantUpdate}
                         onExport={handleExport}
                     />
-                ) : (
-                    <ApplicantsKanban applicants={applicants} onUpdate={fetchApplicants} />
                 )}
             </div>
         </div>

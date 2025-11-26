@@ -10,7 +10,8 @@ import {
     PlusCircle,
     Command,
     GalleryVerticalEnd,
-    AudioWaveform
+    AudioWaveform,
+    Kanban
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -82,6 +83,13 @@ const data = {
             icon: Settings,
         },
     ],
+    navViews: [
+        {
+            title: "Kanban View",
+            url: "/kanban",
+            icon: Kanban,
+        },
+    ],
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -101,6 +109,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     <SidebarGroupLabel>Platform</SidebarGroupLabel>
                     <SidebarMenu>
                         {data.navMain.map((item) => (
+                            <SidebarMenuItem key={item.title}>
+                                <SidebarMenuButton asChild isActive={pathname.startsWith(item.url)} tooltip={item.title}>
+                                    <Link href={item.url}>
+                                        <item.icon />
+                                        <span>{item.title}</span>
+                                    </Link>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                        ))}
+                    </SidebarMenu>
+                </SidebarGroup>
+
+                <SidebarSeparator className="mx-2 my-2" />
+
+                <SidebarGroup>
+                    <SidebarGroupLabel>Views</SidebarGroupLabel>
+                    <SidebarMenu>
+                        {data.navViews.map((item) => (
                             <SidebarMenuItem key={item.title}>
                                 <SidebarMenuButton asChild isActive={pathname.startsWith(item.url)} tooltip={item.title}>
                                     <Link href={item.url}>

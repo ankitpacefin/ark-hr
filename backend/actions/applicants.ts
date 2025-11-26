@@ -75,6 +75,30 @@ export async function getApplicants(
     return { data, count };
 }
 
+// Get applicants by status for kanban columns
+export async function getApplicantsByStatus(
+    workspaceId: string,
+    status: string,
+    page: number = 1,
+    limit: number = 20
+) {
+    const supabase = await createClient();
+    const start = (page - 1) * limit;
+    const end = start + limit - 1;
+
+    const { data, error, count } = await supabase
+        .from("applicants")
+        .select("*, jobs(title)", { count: "exact" })
+        .eq("workspace_id", workspaceId)
+        .eq("status", status)
+        .order("applied_at", { ascending: false })
+        .range(start, end);
+
+    if (error) throw error;
+    return { data, count };
+}
+
+
 export async function getApplicantById(applicantId: string) {
     const supabase = await createClient();
     const { data, error } = await supabase
