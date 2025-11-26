@@ -1,36 +1,29 @@
-# syntax=docker/dockerfile:1
-ARG BUILD_COMMAND=build
+# Stage 1: Build the application
+FROM node:20-alpine3.18 AS builder
 
-# Builder stage
-FROM node:20-alpine AS builder
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
-
-# Install deps
-COPY package*.json ./
+COPY package.json package-lock.json ./
 RUN npm ci --legacy-peer-deps
-
-# Copy source and build
 COPY . .
-# Use the build command passed via build-arg; default is "build"
-RUN npm run ${BUILD_COMMAND}
+RUN npm run build
 
-# Runner stage (smaller image)
+# Stage 2: Production image
 FROM node:20-alpine AS runner
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# copy only production assets from builder
-# adjust what you copy according to your framework (Next/.next, build output folder, etc.)
-COPY --from=builder /app/package*.json ./
-# If you only need production deps, install them (optional)
-RUN npm ci --only=production --legacy-peer-deps || true
+ENV NODE_ENV=production
 
-# Copy built artifact
-COPY --from=builder /app ./
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
 
-VOLUME /app/logs/
+# Copy the standalone build
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+USER nextjs
 
 EXPOSE 3003
+ENV PORT=3003
 
-CMD ["sh", "-c", "npm start > /app/logs/app.log 2>&1"]
+CMD ["node", "server.js"]

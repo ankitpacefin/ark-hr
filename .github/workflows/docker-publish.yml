@@ -10,27 +10,26 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
-permissions:
-  contents: read
-  packages: write
-
 jobs:
-  build-and-push:
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Node.js (for lint/tests)
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install dependencies (CI)
+      - name: Install dependencies
         run: |
           if [ -f package-lock.json ]; then
             npm ci --legacy-peer-deps
@@ -42,27 +41,8 @@ jobs:
         run: npm run lint --legacy-peer-deps
         continue-on-error: true
 
-      - name: Determine version number
-        id: version
-        uses: hennejg/github-tag-action@v4.3.1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Determine build command
-        id: determine_build_command
-        run: |
-          # Write build command to GITHUB_OUTPUT (replacement for set-output)
-          if [ "${{ github.ref }}" = "refs/heads/develop" ]; then
-            echo "BUILD_COMMAND=build" >> $GITHUB_OUTPUT
-          elif [ "${{ github.ref }}" = "refs/heads/pre-prod" ]; then
-            echo "BUILD_COMMAND=build:pre-prod" >> $GITHUB_OUTPUT
-          else
-            # set to build:prod — change to "build" if you don't have build:prod script
-            echo "BUILD_COMMAND=build" >> $GITHUB_OUTPUT
-          fi
-
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -76,7 +56,7 @@ jobs:
         with:
           driver: docker-container
           buildkitd-flags: --debug
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm64/v8
 
       - name: Extract metadata for Docker
         id: meta
@@ -91,20 +71,16 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm64/v8
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # If your Dockerfile does not include a stage named "runner", remove the following line:
           target: runner
-          build-args: |
-            BUILD_COMMAND=${{ steps.determine_build_command.outputs.BUILD_COMMAND }}
 
       - name: Output build information
         run: |
-          echo "Image tags: ${{ steps.meta.outputs.tags }}"
-          echo "Example image (version): ${{ env.REGISTRY }}/${{ github.repository }}:${{ steps.version.outputs.new_version || 'N/A' }}"
-          echo "Supported architectures: linux/amd64, linux/arm64"
+          echo "Multi-arch image built and pushed to:"
+          echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
+          echo "Supported architectures: linux/amd64, linux/arm64/v8"
