@@ -1,56 +1,61 @@
+# syntax=docker/dockerfile:1.4
 FROM node:20-alpine AS base
-
-# Install dependencies only when needed
-FROM base AS deps
-# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk add --no-cache libc6-compat
+# Use a dedicated build stage name and keep base minimal
 WORKDIR /app
 
-# Install dependencies based on the preferred package manager
-COPY package.json package-lock.json* ./
+# ===== deps stage: install dependencies =====
+FROM base AS deps
+# libc6-compat may be needed for some prebuilt native modules or glibc expectations on Alpine
+RUN apk add --no-cache libc6-compat
+
+# Copy package manifests only (better cache)
+COPY package*.json ./ 
+
+# Install all deps (dev + prod) because building Next.js requires dev deps (next, webpack, etc.)
 RUN npm ci
 
-# Rebuild the source code only when needed
+# ===== builder stage: build the app =====
 FROM base AS builder
 WORKDIR /app
+
+# copy node_modules from deps to avoid re-install
 COPY --from=deps /app/node_modules ./node_modules
+# copy source
 COPY . .
 
-# Next.js collects completely anonymous telemetry data about general usage.
-# Learn more here: https://nextjs.org/telemetry
-# Uncomment the following line in case you want to disable telemetry during the build.
+# Optional: disable Next telemetry during build (uncomment to enable)
 # ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
 
-# Production image, copy all the files and run next
-FROM base AS runner
+# ===== runner stage: minimal production image =====
+FROM node:20-alpine AS runner
 WORKDIR /app
 
+# metadata
+LABEL org.opencontainers.image.source="(your-repo-or-url)"
 ENV NODE_ENV=production
-# Uncomment the following line in case you want to disable telemetry during runtime.
-# ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3256
+ENV HOST=0.0.0.0
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# create group/user and prepare app dir in a single layer
+RUN addgroup --system --gid 1001 nodejs \
+ && adduser --system --uid 1001 --ingroup nodejs nextjs \
+ && mkdir -p /app/.next && chown -R nextjs:nodejs /app
 
-COPY --from=builder /app/public ./public
-
-# Set the correct permission for prerender cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-# Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# copy only the standalone output and static files produced by Next.js
+# Use --chown to set ownership properly in image build (avoids an extra chown at runtime)
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./ 
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./ ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 USER nextjs
 
 EXPOSE 3256
 
-ENV PORT=3256
-# set hostname to localhost
-ENV HOSTNAME="0.0.0.0"
+# Minimal heathcheck (requires curl in image -> using builtin node check below to avoid adding curl)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD node -e "const http=require('http'); http.get({host:process.env.HOST||'0.0.0.0', port:process.env.PORT||3256, path:'/'}, res=>{ if(res.statusCode<200||res.statusCode>=400){process.exit(1);} process.exit(0); }).on('error',()=>process.exit(1));"
 
+# The standalone package's server entrypoint is usually 'server.js' in Next standalone mode
 CMD ["node", "server.js"]
