@@ -11,6 +11,48 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine version number
+        id: version
+        uses: hennejg/github-tag-action@v4.3.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine build command
+        id: determine_build_command
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/develop" ]; then
+              echo "::set-output name=BUILD_COMMAND::build"
+          elif [ "${{ github.ref }}" = "refs/heads/pre-prod" ]; then
+              echo "::set-output name=BUILD_COMMAND::build:pre-prod"
+          else
+              echo "::set-output name=BUILD_COMMAND::build:prod"
+          fi
+        shell: bash
+        env:
+          BUILD_COMMAND: ${{ steps.determine_build_command.outputs.BUILD_COMMAND }}
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ghcr.io/pocketful-tech/seo-web:${{ steps.version.outputs.new_version }}
+          build-args: BUILD_COMMAND=${{ steps.determine_build_command.outputs.BUILD_COMMAND }}
+
   build:
     runs-on: ubuntu-latest
     permissions:

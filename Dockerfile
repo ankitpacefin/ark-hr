@@ -1,29 +1,25 @@
-# Stage 1: Build the application
-FROM node:20-alpine3.18 AS builder
-
+ARG BUILD_COMMAND=build
+# Use an official Node.js runtime as the base image
+FROM node:18-alpine
+ARG BUILD_COMMAND
+# Set the working directory in the container
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --legacy-peer-deps
+
+# Copy package.json and package-lock.json to the working directory
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy the entire application to the container
 COPY . .
-RUN npm run build
+VOLUME /app/logs/
+# Build the Next.js application
+RUN npm run $BUILD_COMMAND 
 
-# Stage 2: Production image
-FROM node:20-alpine AS runner
-WORKDIR /app
+# Expose the port on which the application will run
+EXPOSE 3003
 
-ENV NODE_ENV=production
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-# Copy the standalone build
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-
-USER nextjs
-
-EXPOSE 3256
-ENV PORT=3256
-
-CMD ["node", "server.js"]
+# Command to start the application
+#CMD ["npm", "start"]
+CMD ["sh", "-c", "npm start > /app/logs/app.log 2>&1"]
