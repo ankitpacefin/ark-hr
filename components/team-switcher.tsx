@@ -2,6 +2,9 @@
 
 import * as React from "react"
 import { ChevronsUpDown, Plus } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+// import { switchWorkspace } from "@/backend/actions/workspaces" // Uncomment when ready
 
 import {
     DropdownMenu,
@@ -26,10 +29,27 @@ export function TeamSwitcher({
         name: string
         logo: React.ElementType
         plan: string
+        id?: string
     }[]
 }) {
     const { isMobile } = useSidebar()
     const [activeTeam, setActiveTeam] = React.useState(teams[0])
+    const router = useRouter()
+
+    const handleTeamChange = async (team: any) => {
+        setActiveTeam(team);
+        if (team.id) {
+            try {
+                // Call server action to switch workspace (optional, if we want to persist)
+                // await switchWorkspace(team.id);
+                toast.success(`Switched to ${team.name}`);
+                // Refresh to update data based on new workspace
+                // router.refresh(); 
+            } catch (error) {
+                toast.error("Failed to switch workspace");
+            }
+        }
+    };
 
     return (
         <SidebarMenu>
@@ -64,7 +84,7 @@ export function TeamSwitcher({
                         {teams.map((team, index) => (
                             <DropdownMenuItem
                                 key={team.name}
-                                onClick={() => setActiveTeam(team)}
+                                onClick={() => handleTeamChange(team)}
                                 className="gap-2 p-2"
                             >
                                 <div className="flex size-6 items-center justify-center rounded-sm border">

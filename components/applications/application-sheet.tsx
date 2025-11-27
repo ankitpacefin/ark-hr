@@ -38,8 +38,10 @@ import {
     Download,
     ChevronRight
 } from "lucide-react"
+import { SaveToggle } from "./save-toggle"
+
 import { formatDistanceToNow } from "date-fns"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { toast } from "sonner"
 
 interface ApplicationSheetProps {
@@ -49,8 +51,17 @@ interface ApplicationSheetProps {
 }
 
 export function ApplicationSheet({ application, open, onOpenChange }: ApplicationSheetProps) {
+    const [users, setUsers] = useState<any[]>([])
+    const [showMentions, setShowMentions] = useState(false)
+    const [mentionQuery, setMentionQuery] = useState("")
     const [comment, setComment] = useState("")
     const [copied, setCopied] = useState(false)
+
+    useEffect(() => {
+        import("@/backend/actions/users").then(mod => {
+            mod.getUsers().then(setUsers)
+        })
+    }, [])
 
     if (!application) return null
 
@@ -62,6 +73,27 @@ export function ApplicationSheet({ application, open, onOpenChange }: Applicatio
         setCopied(true)
         toast.success("Email copied to clipboard")
         setTimeout(() => setCopied(false), 2000)
+    }
+
+    const handleCommentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const val = e.target.value
+        setComment(val)
+
+        const lastWord = val.split(/\s+/).pop()
+        if (lastWord?.startsWith("@")) {
+            setShowMentions(true)
+            setMentionQuery(lastWord.substring(1))
+        } else {
+            setShowMentions(false)
+        }
+    }
+
+    const insertMention = (userName: string) => {
+        const words = comment.split(/\s+/)
+        words.pop()
+        setComment(words.join(" ") + " @" + userName + " ")
+        setShowMentions(false)
+        // Focus back to textarea would be ideal here
     }
 
     return (
@@ -91,6 +123,7 @@ export function ApplicationSheet({ application, open, onOpenChange }: Applicatio
                                     {application.status}
                                 </Badge>
                                 <div className="flex items-center gap-1">
+                                    <SaveToggle applicantId={application.id} />
                                     <Button variant="outline" size="icon" className="h-8 w-8" onClick={copyEmail} title="Copy Email">
                                         {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                                     </Button>
@@ -318,12 +351,31 @@ export function ApplicationSheet({ application, open, onOpenChange }: Applicatio
                                 </div>
                             )}
                         </ScrollArea>
-                        <div className="p-4 border-t bg-background">
+                        <div className="p-4 border-t bg-background relative">
+                            {showMentions && (
+                                <div className="absolute bottom-full left-4 mb-2 w-64 bg-popover border rounded-md shadow-md overflow-hidden z-50">
+                                    <div className="p-2 text-xs font-medium text-muted-foreground border-b">Suggested Users</div>
+                                    <div className="max-h-48 overflow-y-auto">
+                                        {users.filter(u => u.name.toLowerCase().includes(mentionQuery.toLowerCase())).map(user => (
+                                            <button
+                                                key={user.id}
+                                                className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2"
+                                                onClick={() => insertMention(user.name)}
+                                            >
+                                                <Avatar className="h-6 w-6">
+                                                    <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                                                </Avatar>
+                                                <span>{user.name}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                             <div className="flex gap-2">
                                 <Textarea
-                                    placeholder="Add a comment or note..."
+                                    placeholder="Add a comment or note... (Type @ to mention)"
                                     value={comment}
-                                    onChange={(e) => setComment(e.target.value)}
+                                    onChange={handleCommentChange}
                                     className="min-h-[80px] resize-none"
                                 />
                             </div>

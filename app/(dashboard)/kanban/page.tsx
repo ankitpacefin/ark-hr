@@ -21,6 +21,7 @@ import {
     KanbanMoveEvent,
 } from "@/components/ui/kanban";
 import { format } from "date-fns";
+import { KanbanSkeleton } from "@/components/kanban/kanban-skeleton";
 
 // Status configuration
 const STATUSES = [
@@ -241,9 +242,7 @@ export default function KanbanPage() {
 
             {/* Kanban Board */}
             {isLoading ? (
-                <div className="flex items-center justify-center h-[600px]">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
+                <KanbanSkeleton />
             ) : (
                 <Kanban
                     value={filteredColumns}

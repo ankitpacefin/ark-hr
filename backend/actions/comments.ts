@@ -33,6 +33,7 @@ export async function createComment(data: any) {
     return newComment;
 }
 
+
 export async function deleteComment(commentId: string) {
     const supabase = await createClient();
     const { error } = await supabase
@@ -41,4 +42,27 @@ export async function deleteComment(commentId: string) {
         .eq("id", commentId);
     if (error) throw error;
     return true;
+}
+
+export async function getAllComments(page: number = 1, limit: number = 20) {
+    const supabase = await createClient();
+    const start = (page - 1) * limit;
+    const end = start + limit - 1;
+
+    const { data, error, count } = await supabase
+        .from("comments")
+        .select(`
+            *,
+            users (name, email),
+            applicants (
+                id,
+                name,
+                jobs (title)
+            )
+        `, { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(start, end);
+
+    if (error) throw error;
+    return { data, count };
 }

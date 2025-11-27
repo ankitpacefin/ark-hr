@@ -11,7 +11,9 @@ import {
     Command,
     GalleryVerticalEnd,
     AudioWaveform,
-    Kanban
+    Kanban,
+    MessageSquare,
+    Bookmark
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -82,6 +84,16 @@ const data = {
             url: "/settings",
             icon: Settings,
         },
+        {
+            title: "Comments",
+            url: "/comments",
+            icon: MessageSquare,
+        },
+        {
+            title: "Saved",
+            url: "/saved",
+            icon: Bookmark,
+        },
     ],
     navViews: [
         {
@@ -92,8 +104,16 @@ const data = {
     ],
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({ workspaces, ...props }: React.ComponentProps<typeof Sidebar> & { workspaces?: any[] }) {
     const pathname = usePathname()
+
+    // Map workspaces to teams format
+    const teams = workspaces?.map(ws => ({
+        name: ws.name,
+        logo: GalleryVerticalEnd, // Default logo for now
+        plan: "Enterprise", // Default plan for now
+        id: ws.id
+    })) || data.teams;
 
     return (
         <Sidebar collapsible="icon" {...props}>
@@ -102,7 +122,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     <span className="font-bold text-lg tracking-tight">Ark-hr</span>
                     <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">by Pocketful</span>
                 </div>
-                <TeamSwitcher teams={data.teams} />
+                <TeamSwitcher teams={teams} />
             </SidebarHeader>
             <SidebarContent>
                 <SidebarGroup>
@@ -144,14 +164,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <SidebarGroup>
                     <SidebarGroupLabel>Actions</SidebarGroupLabel>
                     <SidebarMenu>
-                        <SidebarMenuItem>
-                            <SidebarMenuButton asChild tooltip="Post a Job">
-                                <Link href="/jobs/new">
-                                    <PlusCircle />
-                                    <span>Post a Job</span>
-                                </Link>
-                            </SidebarMenuButton>
-                        </SidebarMenuItem>
+                        {/* Removed Post a Job as requested */}
                     </SidebarMenu>
                 </SidebarGroup>
             </SidebarContent>

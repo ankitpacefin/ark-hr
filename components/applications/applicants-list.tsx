@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { MoreHorizontal, ChevronLeft, ChevronRight, Settings2, Download } from "lucide-react";
 import { ApplicantDetails } from "./applicant-details";
+import { SaveToggle } from "./save-toggle";
 import { updateApplicant } from "@/backend/actions/applicants";
 import { getUsers } from "@/backend/actions/filters";
 import { toast } from "sonner";
@@ -181,13 +182,14 @@ export function ApplicantsList({
                             {visibleColumns.score && <TableHead>Score</TableHead>}
                             {visibleColumns.status && <TableHead>Status</TableHead>}
                             {visibleColumns.assignedTo && <TableHead>Assigned To</TableHead>}
+                            <TableHead className="w-[50px]"></TableHead>
                             {visibleColumns.actions && <TableHead className="text-right">Actions</TableHead>}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {applicants.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={9} className="h-24 text-center">
+                                <TableCell colSpan={10} className="h-24 text-center">
                                     No applicants found.
                                 </TableCell>
                             </TableRow>
@@ -264,6 +266,9 @@ export function ApplicantsList({
                                             </Select>
                                         </TableCell>
                                     )}
+                                    <TableCell onClick={(e) => e.stopPropagation()}>
+                                        <SaveToggle applicantId={applicant.id} />
+                                    </TableCell>
                                     {visibleColumns.actions && (
                                         <TableCell className="text-right">
                                             <DropdownMenu>
@@ -283,6 +288,11 @@ export function ApplicantsList({
                                                         }}
                                                     >
                                                         Copy Email
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem asChild>
+                                                        <div onClick={(e) => e.stopPropagation()} className="w-full cursor-pointer">
+                                                            <SaveToggle applicantId={applicant.id} showLabel className="w-full justify-start px-2" />
+                                                        </div>
                                                     </DropdownMenuItem>
                                                     <DropdownMenuSeparator />
                                                     <DropdownMenuItem onClick={() => handleRowClick(applicant)}>
