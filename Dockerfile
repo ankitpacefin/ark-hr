@@ -23,7 +23,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 USER nextjs
 
-EXPOSE 3003
-ENV PORT=3003
+EXPOSE 8547
+ENV PORT=8547
 
 CMD ["node", "server.js"]
